@@ -21,7 +21,7 @@ VOLUME ["/data"]
 EXPOSE 9999
 ENV TZ=Asia/Shanghai
 ENV RUST_LOG=info
-ENV CONFIG_PATH=/data/moe-sekai-configs.yaml
+ENV CONFIG_PATH=/app/moe-sekai-configs.example.yaml
 ARG VERSION=dev
 LABEL org.opencontainers.image.version="${VERSION}"
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD wget -qO- "http://127.0.0.1:${PORT:-9999}/health" >/dev/null 2>&1 || exit 1
