@@ -1,4 +1,4 @@
-use haruki_sekai_api::ingest_engine::IngestionEngine;
+use moe_sekai_api::ingest_engine::IngestionEngine;
 use sea_orm::{ConnectOptions, Database};
 use std::time::Duration;
 

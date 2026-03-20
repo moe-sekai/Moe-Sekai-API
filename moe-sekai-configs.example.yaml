@@ -1,0 +1,146 @@
+proxy: ""
+jp_sekai_cookie_url: "<replace-if-needed>"
+
+git:
+  enabled: false
+  username: ""
+  email: ""
+  password: ""
+
+redis:
+  enabled: false
+  host: "127.0.0.1"
+  port: 6379
+  password: ""
+
+backend:
+  host: "0.0.0.0"
+  port: 9999
+  ssl: false
+  ssl_cert: ""
+  ssl_key: ""
+  log_level: "INFO"
+  main_log_file: ""
+  access_log: "${time} ${ip} ${status} ${method} ${path}\n"
+  access_log_path: ""
+  sekai_user_jwt_signing_key: "<replace-with-secret>"
+  enable_trust_proxy: false
+  trusted_proxies: []
+  proxy_header: "X-Forwarded-For"
+
+database:
+  enabled: true
+  driver: "sqlite"
+  dsn: "sqlite:./runtime/app.db?mode=rwc"
+  max_connections: 5
+
+master_database:
+  enabled: false
+  driver: "postgres"
+  dsn: ""
+  max_connections: 5
+
+apphash_sources: []
+asset_updater_servers: []
+
+servers:
+  jp:
+    enabled: false
+    api_url: ""
+    require_cookies: true
+    headers:
+      Host: ""
+    aes_key_hex: ""
+    aes_iv_hex: ""
+    account_dir: "./runtime/accounts/jp"
+    master_dir: "./runtime/master/jp"
+    version_path: "./runtime/versions/jp.json"
+    nuverse_master_data_url: ""
+    nuverse_structure_file_path: ""
+    enable_master_updater: false
+    master_updater_cron: "7 * * * * *"
+    enable_app_hash_updater: false
+    app_hash_updater_cron: "30 * * * * *"
+
+  cn:
+    enabled: false
+    api_url: ""
+    require_cookies: false
+    headers:
+      Host: ""
+      User-Agent: "<replace-if-needed>"
+      Accept-Encoding: "deflate, gzip"
+      Content-Type: "application/octet-stream"
+      Accept: "application/octet-stream"
+      X-Install-Id: "<replace-if-needed>"
+      X-CHANNEL-OP: "<replace-if-needed>"
+      X-Platform: "Android"
+      device_id: "<replace-if-needed>"
+      X-DeviceModel: "<replace-if-needed>"
+      X-OperatingSystem: "<replace-if-needed>"
+      X-Unity-Version: "<replace-if-needed>"
+    aes_key_hex: ""
+    aes_iv_hex: ""
+    account_dir: "./runtime/accounts/cn"
+    master_dir: "./runtime/master/cn"
+    version_path: "./runtime/versions/cn.json"
+    nuverse_master_data_url: ""
+    nuverse_structure_file_path: ""
+    enable_master_updater: false
+    master_updater_cron: "7 * * * * *"
+    enable_app_hash_updater: false
+    app_hash_updater_cron: "30 * * * * *"
+
+  en:
+    enabled: false
+    api_url: ""
+    require_cookies: false
+    headers:
+      Host: ""
+    aes_key_hex: ""
+    aes_iv_hex: ""
+    account_dir: "./runtime/accounts/en"
+    master_dir: "./runtime/master/en"
+    version_path: "./runtime/versions/en.json"
+    nuverse_master_data_url: ""
+    nuverse_structure_file_path: ""
+    enable_master_updater: false
+    master_updater_cron: "7 * * * * *"
+    enable_app_hash_updater: false
+    app_hash_updater_cron: "30 * * * * *"
+
+  tw:
+    enabled: false
+    api_url: ""
+    require_cookies: false
+    headers:
+      Host: ""
+    aes_key_hex: ""
+    aes_iv_hex: ""
+    account_dir: "./runtime/accounts/tw"
+    master_dir: "./runtime/master/tw"
+    version_path: "./runtime/versions/tw.json"
+    nuverse_master_data_url: ""
+    nuverse_structure_file_path: ""
+    enable_master_updater: false
+    master_updater_cron: "7 * * * * *"
+    enable_app_hash_updater: false
+    app_hash_updater_cron: "30 * * * * *"
+
+  kr:
+    enabled: false
+    api_url: ""
+    require_cookies: false
+    headers:
+      Host: ""
+    aes_key_hex: ""
+    aes_iv_hex: ""
+    account_dir: "./runtime/accounts/kr"
+    master_dir: "./runtime/master/kr"
+    version_path: "./runtime/versions/kr.json"
+    nuverse_master_data_url: ""
+    nuverse_structure_file_path: ""
+    enable_master_updater: false
+    master_updater_cron: "7 * * * * *"
+    enable_app_hash_updater: false
+    app_hash_updater_cron: "30 * * * * *"

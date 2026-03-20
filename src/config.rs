@@ -221,13 +221,21 @@ impl Default for GitConfig {
 impl Config {
     pub fn load() -> anyhow::Result<Self> {
         let config_path =
-            env::var("CONFIG_PATH").unwrap_or_else(|_| "haruki-sekai-configs.yaml".to_string());
+            env::var("CONFIG_PATH").unwrap_or_else(|_| "moe-sekai-configs.yaml".to_string());
         let path = Path::new(&config_path);
         let file = File::open(path)
             .map_err(|e| anyhow::anyhow!("Failed to open config file '{}': {}", config_path, e))?;
         let reader = BufReader::new(file);
-        let config: Config = serde_yaml::from_reader(reader)
+        let mut config: Config = serde_yaml::from_reader(reader)
             .map_err(|e| anyhow::anyhow!("Failed to parse config: {}", e))?;
+
+        if let Ok(port_str) = env::var("PORT") {
+            let port = port_str
+                .parse::<u16>()
+                .map_err(|e| anyhow::anyhow!("Invalid PORT '{}': {}", port_str, e))?;
+            config.backend.port = port;
+        }
+
         Ok(config)
     }
 }

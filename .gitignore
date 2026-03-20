@@ -23,5 +23,13 @@ target
 # Self tested
 test.rs
 test.py
-haruki-sekai-configs.yaml
+moe-sekai-configs.yaml
+moe-sekai-configs.local-template.yaml
+local-data/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+.narrafork/
 Data/
+example.config

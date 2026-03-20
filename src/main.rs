@@ -5,14 +5,14 @@ use tokio::signal;
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
-use haruki_sekai_api::api::create_router;
-use haruki_sekai_api::client::SekaiClient;
-use haruki_sekai_api::config::Config;
-use haruki_sekai_api::db;
-use haruki_sekai_api::error::AppError;
-use haruki_sekai_api::updater;
+use moe_sekai_api::api::create_router;
+use moe_sekai_api::client::SekaiClient;
+use moe_sekai_api::config::Config;
+use moe_sekai_api::db;
+use moe_sekai_api::error::AppError;
+use moe_sekai_api::updater;
 
-use haruki_sekai_api::AppState;
+use moe_sekai_api::AppState;
 
 struct LocalTimer;
 
@@ -39,10 +39,10 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     info!(
-        "========================= Haruki Sekai API v{} =========================",
+        "========================== Moe Sekai API v{} ==========================",
         env!("CARGO_PKG_VERSION")
     );
-    info!("Powered By Haruki Dev Team");
+    info!("Powered by the Moe Sekai API runtime");
     let config = match Config::load() {
         Ok(cfg) => cfg,
         Err(e) => {
@@ -50,6 +50,12 @@ async fn main() -> anyhow::Result<()> {
             std::process::exit(1);
         }
     };
+    let config_path = std::env::var("CONFIG_PATH")
+        .unwrap_or_else(|_| "moe-sekai-configs.yaml".to_string());
+    info!("Using config file: {}", config_path);
+    if let Ok(port) = std::env::var("PORT") {
+        info!("PORT environment override detected: {}", port);
+    }
     let state = match init_app_state(config).await {
         Ok(s) => Arc::new(s),
         Err(e) => {
@@ -77,7 +83,7 @@ async fn main() -> anyhow::Result<()> {
     )
     .parse()
     .expect("Invalid address");
-    info!("Starting HTTP server at {}", addr);
+    info!("Moe Sekai API listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())

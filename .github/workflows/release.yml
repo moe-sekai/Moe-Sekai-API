@@ -18,31 +18,31 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             name: linux-amd64
-            binary_name: haruki-sekai-api
+            binary_name: moe-sekai-api
             static: true
           # Linux ARM64 - Static musl build
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-musl
             name: linux-arm64
-            binary_name: haruki-sekai-api
+            binary_name: moe-sekai-api
             static: true
           # Windows AMD64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             name: windows-amd64
-            binary_name: haruki-sekai-api.exe
+            binary_name: moe-sekai-api.exe
             static: false
           # macOS AMD64
           - os: macos-latest
             target: x86_64-apple-darwin
             name: macos-amd64
-            binary_name: haruki-sekai-api
+            binary_name: moe-sekai-api
             static: false
           # macOS ARM64
           - os: macos-latest
             target: aarch64-apple-darwin
             name: macos-arm64
-            binary_name: haruki-sekai-api
+            binary_name: moe-sekai-api
             static: false
 
     steps:
@@ -102,7 +102,7 @@ jobs:
         cd target/${{ matrix.target }}/release
         
         VERSION="${{ steps.version.outputs.version }}"
-        ARCHIVE_NAME="haruki-sekai-api-${VERSION}-${{ matrix.name }}"
+        ARCHIVE_NAME="moe-sekai-api-${VERSION}-${{ matrix.name }}"
         
         if [ "${{ matrix.os }}" == "windows-latest" ]; then
           7z a "../../../dist/${ARCHIVE_NAME}.zip" "${{ matrix.binary_name }}"
@@ -147,7 +147,7 @@ jobs:
       run: |
         TAG="${GITHUB_REF_NAME}"
         VERSION="${{ steps.version.outputs.version }}"
-        TITLE="Haruki Sekai API v${VERSION}"
+        TITLE="Moe Sekai API v${VERSION}"
         REPO="${GITHUB_REPOSITORY}"
         
         if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then

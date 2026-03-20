@@ -152,12 +152,14 @@ impl SekaiAccount for SekaiAccountNuverse {
             .parse()
             .map_err(|_| AppError::ParseError(format!("Invalid user_id: {}", self.user_id)))?;
 
+        let fallback_device_id = if self.device_id.is_empty() {
+            Some(self.user_id.as_str())
+        } else {
+            Some(self.device_id.as_str())
+        };
+
         let payload = LoginPayload {
-            device_id: if self.device_id.is_empty() {
-                None
-            } else {
-                Some(&self.device_id)
-            },
+            device_id: fallback_device_id,
             access_token: &self.access_token,
             user_id: user_id_num,
         };

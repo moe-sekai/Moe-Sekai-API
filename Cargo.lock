@@ -1306,43 +1306,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "haruki-sekai-api"
-version = "6.0.0"
-dependencies = [
- "aes",
- "anyhow",
- "axum",
- "base64",
- "cbc",
- "chrono",
- "futures",
- "git2",
- "hex",
- "indexmap",
- "jsonwebtoken",
- "notify",
- "num_enum",
- "parking_lot",
- "redis",
- "regex",
- "reqwest",
- "rmp-serde",
- "rmpv",
- "sea-orm",
- "serde",
- "serde_json",
- "sonic-rs",
- "thiserror 2.0.18",
- "tokio",
- "tokio-cron-scheduler",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "yaml_serde",
-]
-
-[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2061,6 +2024,43 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "moe-sekai-api"
+version = "6.0.0"
+dependencies = [
+ "aes",
+ "anyhow",
+ "axum",
+ "base64",
+ "cbc",
+ "chrono",
+ "futures",
+ "git2",
+ "hex",
+ "indexmap",
+ "jsonwebtoken",
+ "notify",
+ "num_enum",
+ "parking_lot",
+ "redis",
+ "regex",
+ "reqwest",
+ "rmp-serde",
+ "rmpv",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "sonic-rs",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-cron-scheduler",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "yaml_serde",
 ]
 
 [[package]]

@@ -587,15 +587,15 @@ impl SekaiClient {
 
     pub async fn handle_response_ordered(
         &self,
-        resp: Response,
-    ) -> Result<(IndexMap<String, serde_json::Value>, u16), AppError> {
+        resp: reqwest::Response,
+    ) -> Result<(IndexMap<String, JsonValue>, u16), AppError> {
         let status = resp.status().as_u16();
         let content_type = resp
             .headers()
             .get("content-type")
-            .and_then(|h| h.to_str().ok())
+            .and_then(|v| v.to_str().ok())
             .unwrap_or("")
-            .to_lowercase();
+            .to_string();
         let body = resp
             .bytes()
             .await
@@ -620,18 +620,34 @@ impl SekaiClient {
             }
         } else {
             let sekai_status = SekaiHttpStatus::from_code(status)?;
+            let body_text = String::from_utf8_lossy(&body).trim().to_string();
             match sekai_status {
+                SekaiHttpStatus::ClientError => Err(AppError::BadRequest(if body_text.is_empty() {
+                    "Upstream bad request".to_string()
+                } else {
+                    body_text.clone()
+                })),
+                SekaiHttpStatus::NotFound => Err(AppError::NotFound(if body_text.is_empty() {
+                    "Upstream resource not found".to_string()
+                } else {
+                    body_text.clone()
+                })),
+                SekaiHttpStatus::Conflict => Err(AppError::Internal(if body_text.is_empty() {
+                    "Upstream conflict".to_string()
+                } else {
+                    body_text.clone()
+                })),
                 SekaiHttpStatus::UnderMaintenance => Err(AppError::UnderMaintenance),
                 SekaiHttpStatus::ServerError => Err(AppError::Unknown {
                     status,
-                    body: String::from_utf8_lossy(&body).to_string(),
+                    body: body_text,
                 }),
                 SekaiHttpStatus::SessionError if content_type.contains("xml") => {
                     Err(AppError::CookieExpired)
                 }
                 _ => Err(AppError::Unknown {
                     status,
-                    body: String::from_utf8_lossy(&body).to_string(),
+                    body: body_text,
                 }),
             }
         }
@@ -652,6 +668,9 @@ impl SekaiClient {
             (url, reqwest::Method::POST)
         };
         let mut req = self.prepare_request(session, method, &url);
+        req = req
+            .header(reqwest::header::CONTENT_TYPE, "application/octet-stream")
+            .header(reqwest::header::ACCEPT, "application/octet-stream");
         req = req.body(encrypted);
         info!("Account #{} logging in...", session.user_id());
         let resp = req

@@ -37,6 +37,9 @@ pub enum AppError {
     #[error("Parse error: {0}")]
     ParseError(String),
 
+    #[error("Bad request: {0}")]
+    BadRequest(String),
+
     #[error("Network error: {0}")]
     NetworkError(String),
 
@@ -71,7 +74,7 @@ impl AppError {
             AppError::SessionError | AppError::CookieExpired => StatusCode::FORBIDDEN,
             AppError::UpgradeRequired => StatusCode::UPGRADE_REQUIRED,
             AppError::UnderMaintenance => StatusCode::SERVICE_UNAVAILABLE,
-            AppError::InvalidServerRegion(_) | AppError::ParseError(_) => StatusCode::BAD_REQUEST,
+            AppError::InvalidServerRegion(_) | AppError::ParseError(_) | AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
             AppError::AuthError(_) => StatusCode::UNAUTHORIZED,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Forbidden(_) => StatusCode::FORBIDDEN,

@@ -1,9 +1,9 @@
 [package]
-name = "haruki-sekai-api"
+name = "moe-sekai-api"
 version = "6.0.0"
 edition = "2021"
 authors = ["Haruki Dev Team"]
-description = "Haruki Sekai API - Rust Edition"
+description = "Moe Sekai API - Rust Edition"
 rust-version = "1.70"
 
 [dependencies]

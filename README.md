@@ -1,26 +1,141 @@
-> [!Caution]
-> This project was rewritten in Rust.  
-> Go edition and Python edition are not maintained anymore.  
-> If you want to use Python edition, please go to [old python branch](https://github.com/Team-Haruki/Haruki-Sekai-API/tree/old-python).  
-> If you want to use Go edition, please go to [old go branch](https://github.com/Team-Haruki/Haruki-Sekai-API/tree/old-go).
+# Moe Sekai API
 
-# Haruki Sekai API
+Moe Sekai API 是一个基于 Rust 的自部署 API 服务，面向需要统一接入多区服游戏接口的开发与维护场景。
 
-**Haruki Sekai API** is a companion project for [HarukiBot](https://github.com/Team-Haruki), providing direct API access to various servers of the game `Project Sekai: Colorful Stage`.
+本项目基于 [Team-Haruki/Haruki-Sekai-API](https://github.com/Team-Haruki/Haruki-Sekai-API) 进行修改与整理，并在命名、配置方式、容器化与文档组织上做了适配性调整。
 
-## Requirements
-+ `MySQL`, `SQLite`, `PostgreSQL` (Optional, depending on your database choice)
-+ `Redis` (Optional, for caching sekai users)
+## 说明
 
-## How to Use
-1. Go to release page to download `haruki-sekai-api`
-2. Rename `haruki-sekai-configs.example.yaml` to `haruki-sekai-configs.yaml` and then edit it.
-3. Make a new directory or use an exists directory
-4. Put `haruki-sekai-api` and `haruki-sekai-configs.yaml` in the same directory
-5. Edit `haruki-sekai-configs.yaml` and configure it
-6. Open Terminal, and `cd` to the directory
-7. Run `haruki-sekai-api`
+本仓库仅提供源码、基础运行方式与公开示例配置。
+
+以下内容**不会**随仓库提供：
+- 任何真实账号文件
+- 任何生产可用密钥、Cookie、设备标识或请求头样本
+- 任何私有运行数据、数据库文件或版本文件
+- 任何现网部署信息、业务状态或内部运维细节
+
+如果你要运行本项目，需要自行准备你自己的配置、账号与运行环境。
+
+## 快速开始
+
+### 本地运行
+
+1. 准备 Rust 工具链。
+2. 构建项目：
+
+```bash
+cargo build --release
+```
+
+3. 将 `moe-sekai-configs.example.yaml` 复制为你的私有运行配置，例如：
+
+```bash
+cp moe-sekai-configs.example.yaml moe-sekai-configs.yaml
+```
+
+4. 按你的环境填写配置。
+5. 启动服务：
+
+```bash
+./target/release/moe-sekai-api
+```
+
+如需指定配置文件路径：
+
+```bash
+CONFIG_PATH=/path/to/moe-sekai-configs.yaml ./target/release/moe-sekai-api
+```
+
+如需临时覆盖监听端口：
+
+```bash
+PORT=8080 ./target/release/moe-sekai-api
+```
+
+### Docker
+
+仓库根目录包含 `Dockerfile`，可直接构建：
+
+```bash
+docker build -t moe-sekai-api .
+```
+
+一个最小运行示例：
+
+```bash
+docker run -d \
+  -p 9999:9999 \
+  -v $(pwd)/data:/data \
+  --name moe-sekai-api \
+  moe-sekai-api
+```
+
+默认约定：
+- 容器内配置路径：`/data/moe-sekai-configs.yaml`
+- 默认端口：`9999`
+- 健康检查接口：`/health`
+
+## 配置
+
+默认配置文件名：
+
+- `moe-sekai-configs.yaml`
+
+公开仓库中的配置入口：
+
+- `moe-sekai-configs.example.yaml`
+
+请注意：
+- `moe-sekai-configs.example.yaml` 仅为公开示例，不包含真实可用配置
+- 真实运行配置不应提交到仓库
+- 所有密钥、凭据、设备标识、Cookie 与账号文件都应自行提供
+
+常用环境变量：
+- `CONFIG_PATH`：指定配置文件路径
+- `PORT`：覆盖监听端口
+
+访问受保护路由时使用请求头：
+- `x-moe-sekai-token`
+
+## 目录建议
+
+建议将运行时数据与源码分离。一个常见布局如下：
+
+```text
+runtime/
+├── moe-sekai-configs.yaml
+├── accounts/
+├── master/
+└── versions/
+```
+
+或者在容器中统一使用：
+
+```text
+/data/
+├── moe-sekai-configs.yaml
+├── accounts/
+├── master/
+└── versions/
+```
+
+## 安全与开源边界
+
+为避免误泄露，以下文件或目录不应提交：
+- 真实配置文件
+- 账号目录
+- 本地数据库文件
+- 本地日志文件
+- 运行时主数据与版本数据
+
+本仓库中的示例配置与文档会尽量保持通用与保守，不会包含真实业务环境信息。
+
+## 上游说明
+
+本项目基于 [Team-Haruki/Haruki-Sekai-API](https://github.com/Team-Haruki/Haruki-Sekai-API) 进行修改与整理，并在配置方式、容器化与文档组织上做了进一步调整。
 
 ## License
+
+上游项目采用 **MIT License** 发布，本项目在保留原许可要求的前提下继续进行修改与整理。
 
 This project is licensed under the MIT License.
