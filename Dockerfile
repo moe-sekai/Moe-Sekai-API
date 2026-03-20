@@ -15,7 +15,7 @@ RUN apk --no-cache add ca-certificates tzdata wget && addgroup -S app && adduser
 WORKDIR /app
 COPY --from=builder /app/target/release/moe-sekai-api .
 COPY Data ./Data
-COPY moe-sekai-configs.example.yaml /app/moe-sekai-configs.example.yaml
+COPY --from=builder /app/moe-sekai-configs.example.yaml /app/moe-sekai-configs.example.yaml
 RUN mkdir -p /data /app && chown -R app:app /app /data
 VOLUME ["/data"]
 EXPOSE 9999
