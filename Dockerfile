@@ -16,14 +16,14 @@ WORKDIR /app
 COPY --from=builder /app/target/release/moe-sekai-api .
 COPY Data ./Data
 COPY --from=builder /app/moe-sekai-configs.example.yaml /app/moe-sekai-configs.example.yaml
-RUN mkdir -p /data /app && chown -R app:app /app /data
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN mkdir -p /data /app && chmod +x /app/docker-entrypoint.sh && chown -R app:app /app /data
 VOLUME ["/data"]
 EXPOSE 9999
 ENV TZ=Asia/Shanghai
 ENV RUST_LOG=info
-ENV CONFIG_PATH=/app/moe-sekai-configs.example.yaml
 ARG VERSION=dev
 LABEL org.opencontainers.image.version="${VERSION}"
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD wget -qO- "http://127.0.0.1:${PORT:-9999}/health" >/dev/null 2>&1 || exit 1
 USER app
-CMD ["./moe-sekai-api"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
