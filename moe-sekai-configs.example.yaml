@@ -29,7 +29,7 @@ backend:
   proxy_header: "X-Forwarded-For"
 
 database:
-  enabled: true
+  enabled: false
   driver: "sqlite"
   dsn: "sqlite:./runtime/app.db?mode=rwc"
   max_connections: 5
