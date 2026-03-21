@@ -2,8 +2,14 @@
 set -eu
 
 DEFAULT_CONFIG="/app/moe-sekai-configs.example.yaml"
+PERSISTENT_CONFIG="/data/moe-sekai-configs.yaml"
 
 mkdir -p /data /data/accounts /data/master /data/versions
-export CONFIG_PATH="$DEFAULT_CONFIG"
+
+if [ -f "$PERSISTENT_CONFIG" ]; then
+  export CONFIG_PATH="$PERSISTENT_CONFIG"
+else
+  export CONFIG_PATH="$DEFAULT_CONFIG"
+fi
 
 exec /app/moe-sekai-api
