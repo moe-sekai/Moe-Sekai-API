@@ -33,3 +33,4 @@ local-data/
 .narrafork/
 Data/
 example.config
+.worktrees/
