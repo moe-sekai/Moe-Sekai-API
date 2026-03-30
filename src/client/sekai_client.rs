@@ -110,6 +110,7 @@ impl SekaiClient {
             );
             return Ok(());
         }
+        let mut upgrade_refreshed = false;
         for account in accounts {
             if self.region.is_cp_server() && account.user_id().is_empty() {
                 warn!(
@@ -122,6 +123,62 @@ impl SekaiClient {
             match self.login(&session).await {
                 Ok(_) => {
                     self.sessions.write().push(session);
+                }
+                Err(AppError::UpgradeRequired) if !upgrade_refreshed => {
+                    upgrade_refreshed = true;
+                    warn!(
+                        "{} Login returned 426 during init, refreshing version...",
+                        self.region.as_str().to_uppercase()
+                    );
+                    if let Err(e) = self.refresh_version_from_remote().await {
+                        error!(
+                            "{} Failed to refresh version: {}",
+                            self.region.as_str().to_uppercase(),
+                            e
+                        );
+                        continue;
+                    }
+                    match self.login(&session).await {
+                        Ok(login_resp) => {
+                            self.update_version_headers_from_login(&login_resp);
+                            self.sessions.write().push(session);
+                        }
+                        Err(AppError::UpgradeRequired) => {
+                            warn!(
+                                "{} Still 426 after version refresh, waiting for app version update...",
+                                self.region.as_str().to_uppercase()
+                            );
+                            tokio::time::sleep(Duration::from_secs(10)).await;
+                            if let Err(e) = self.refresh_version_from_remote().await {
+                                error!(
+                                    "{} Failed to refresh version after wait: {}",
+                                    self.region.as_str().to_uppercase(),
+                                    e
+                                );
+                                continue;
+                            }
+                            match self.login(&session).await {
+                                Ok(login_resp) => {
+                                    self.update_version_headers_from_login(&login_resp);
+                                    self.sessions.write().push(session);
+                                }
+                                Err(e) => {
+                                    error!(
+                                        "{} Login failed after waiting for app update: {}",
+                                        self.region.as_str().to_uppercase(),
+                                        e
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            error!(
+                                "{} Re-login after version refresh failed: {}",
+                                self.region.as_str().to_uppercase(),
+                                e
+                            );
+                        }
+                    }
                 }
                 Err(e) => {
                     error!(
@@ -170,6 +227,57 @@ impl SekaiClient {
         Ok(())
     }
 
+    pub async fn refresh_version_from_remote(&self) -> Result<(), AppError> {
+        let url = if !self.config.remote_version_url.is_empty() {
+            self.config.remote_version_url.clone()
+        } else {
+            Self::default_remote_version_url(self.region).to_string()
+        };
+        if url.is_empty() {
+            return self.refresh_version().await;
+        }
+        info!(
+            "{} Fetching remote version from {}",
+            self.region.as_str().to_uppercase(),
+            url
+        );
+        match self
+            .version_helper
+            .fetch_and_update_from_remote(&url, self.proxy.as_deref())
+            .await
+        {
+            Ok(version) => {
+                info!(
+                    "{} Remote version fetched: appVersion={}, appHash={}",
+                    self.region.as_str().to_uppercase(),
+                    version.app_version,
+                    &version.app_hash[..version.app_hash.len().min(16)]
+                );
+                self.update_version_headers(&version);
+                Ok(())
+            }
+            Err(e) => {
+                warn!(
+                    "{} Failed to fetch remote version: {}, falling back to local",
+                    self.region.as_str().to_uppercase(),
+                    e
+                );
+                self.refresh_version().await
+            }
+        }
+    }
+
+    fn default_remote_version_url(region: crate::config::ServerRegion) -> &'static str {
+        use crate::config::ServerRegion;
+        match region {
+            ServerRegion::Jp => "https://raw.githubusercontent.com/Team-Haruki/haruki-sekai-master/main/versions/current_version.json",
+            ServerRegion::En => "https://raw.githubusercontent.com/Team-Haruki/haruki-sekai-en-master/main/versions/current_version.json",
+            ServerRegion::Tw => "https://raw.githubusercontent.com/Team-Haruki/haruki-sekai-tc-master/main/versions/current_version.json",
+            ServerRegion::Kr => "https://raw.githubusercontent.com/Team-Haruki/haruki-sekai-kr-master/main/versions/current_version.json",
+            ServerRegion::Cn => "https://raw.githubusercontent.com/Team-Haruki/haruki-sekai-sc-master/main/versions/current_version.json",
+        }
+    }
+
     pub async fn refresh_cookies(&self) -> Result<(), AppError> {
         if let Some(ref helper) = self.cookie_helper {
             let cookie = helper.get_cookies(self.proxy.as_deref()).await?;
@@ -191,6 +299,7 @@ impl SekaiClient {
             self.session_index.store(0, Ordering::SeqCst);
         }
         let accounts = self.parse_accounts()?;
+        let mut upgrade_refreshed = false;
         for account in accounts {
             if self.region.is_cp_server() && account.user_id().is_empty() {
                 warn!(
@@ -203,6 +312,62 @@ impl SekaiClient {
             match self.login(&session).await {
                 Ok(_) => {
                     self.sessions.write().push(session);
+                }
+                Err(AppError::UpgradeRequired) if !upgrade_refreshed => {
+                    upgrade_refreshed = true;
+                    warn!(
+                        "{} Login returned 426 during reload, refreshing version...",
+                        self.region.as_str().to_uppercase()
+                    );
+                    if let Err(e) = self.refresh_version_from_remote().await {
+                        error!(
+                            "{} Failed to refresh version: {}",
+                            self.region.as_str().to_uppercase(),
+                            e
+                        );
+                        continue;
+                    }
+                    match self.login(&session).await {
+                        Ok(login_resp) => {
+                            self.update_version_headers_from_login(&login_resp);
+                            self.sessions.write().push(session);
+                        }
+                        Err(AppError::UpgradeRequired) => {
+                            warn!(
+                                "{} Still 426 after version refresh, waiting for app version update...",
+                                self.region.as_str().to_uppercase()
+                            );
+                            tokio::time::sleep(Duration::from_secs(10)).await;
+                            if let Err(e) = self.refresh_version_from_remote().await {
+                                error!(
+                                    "{} Failed to refresh version after wait: {}",
+                                    self.region.as_str().to_uppercase(),
+                                    e
+                                );
+                                continue;
+                            }
+                            match self.login(&session).await {
+                                Ok(login_resp) => {
+                                    self.update_version_headers_from_login(&login_resp);
+                                    self.sessions.write().push(session);
+                                }
+                                Err(e) => {
+                                    error!(
+                                        "{} Login failed after waiting for app update: {}",
+                                        self.region.as_str().to_uppercase(),
+                                        e
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            error!(
+                                "{} Re-login after version refresh failed: {}",
+                                self.region.as_str().to_uppercase(),
+                                e
+                            );
+                        }
+                    }
                 }
                 Err(e) => {
                     error!(
@@ -752,8 +917,8 @@ impl SekaiClient {
                         "{} Server upgrade required, refreshing version and re-logging in...",
                         self.region.as_str().to_uppercase()
                     );
-                    // First attempt: refresh version from file and try login
-                    self.refresh_version().await?;
+                    // First attempt: refresh version from remote and try login
+                    self.refresh_version_from_remote().await?;
                     match self.login(&session).await {
                         Ok(login_resp) => {
                             self.update_version_headers_from_login(&login_resp);
@@ -764,7 +929,7 @@ impl SekaiClient {
                                 self.region.as_str().to_uppercase()
                             );
                             tokio::time::sleep(Duration::from_secs(10)).await;
-                            self.refresh_version().await?;
+                            self.refresh_version_from_remote().await?;
                             match self.login(&session).await {
                                 Ok(login_resp) => {
                                     self.update_version_headers_from_login(&login_resp);

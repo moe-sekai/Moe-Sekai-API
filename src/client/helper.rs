@@ -122,6 +122,85 @@ impl VersionHelper {
     pub fn update(&self, info: VersionInfo) {
         *self.version_info.lock() = info;
     }
+
+    pub async fn fetch_and_update_from_remote(
+        &self,
+        url: &str,
+        proxy: Option<&str>,
+    ) -> Result<VersionInfo, AppError> {
+        let mut builder = Client::builder().timeout(std::time::Duration::from_secs(10));
+        if let Some(proxy_url) = proxy {
+            if !proxy_url.is_empty() {
+                builder = builder.proxy(
+                    reqwest::Proxy::all(proxy_url)
+                        .map_err(|e| AppError::NetworkError(format!("Invalid proxy: {}", e)))?,
+                );
+            }
+        }
+        let client = builder
+            .build()
+            .map_err(|e| AppError::NetworkError(e.to_string()))?;
+        let resp = client
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| AppError::NetworkError(e.to_string()))?;
+        if !resp.status().is_success() {
+            return Err(AppError::NetworkError(format!(
+                "Remote version fetch returned {}",
+                resp.status()
+            )));
+        }
+        let body = resp
+            .bytes()
+            .await
+            .map_err(|e| AppError::NetworkError(e.to_string()))?;
+        let remote: VersionInfo = sonic_rs::from_slice(&body)
+            .map_err(|e| AppError::ParseError(format!("Failed to parse remote version: {}", e)))?;
+
+        // Merge remote fields into local version file
+        let path = Path::new(&self.version_file_path);
+        let mut existing: serde_json::Map<String, serde_json::Value> =
+            if tokio::fs::try_exists(path).await.unwrap_or(false) {
+                let data = tokio::fs::read(path).await?;
+                sonic_rs::from_slice(&data).unwrap_or_default()
+            } else {
+                serde_json::Map::new()
+            };
+        existing.insert(
+            "appVersion".to_string(),
+            serde_json::Value::String(remote.app_version.clone()),
+        );
+        existing.insert(
+            "appHash".to_string(),
+            serde_json::Value::String(remote.app_hash.clone()),
+        );
+        existing.insert(
+            "dataVersion".to_string(),
+            serde_json::Value::String(remote.data_version.clone()),
+        );
+        existing.insert(
+            "assetVersion".to_string(),
+            serde_json::Value::String(remote.asset_version.clone()),
+        );
+        existing.insert(
+            "assetHash".to_string(),
+            serde_json::Value::String(remote.asset_hash.clone()),
+        );
+        existing.insert(
+            "cdnVersion".to_string(),
+            serde_json::Value::Number(remote.cdn_version.into()),
+        );
+        let json = sonic_rs::to_string_pretty(&existing)
+            .map_err(|e| AppError::ParseError(e.to_string()))?;
+        if let Some(parent) = path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        tokio::fs::write(path, &json).await?;
+
+        *self.version_info.lock() = remote.clone();
+        Ok(remote)
+    }
 }
 
 pub fn compare_version(new_version: &str, current_version: &str) -> Result<bool, AppError> {

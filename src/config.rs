@@ -154,6 +154,8 @@ pub struct ServerConfig {
     pub enable_app_hash_updater: bool,
     #[serde(default)]
     pub app_hash_updater_cron: String,
+    #[serde(default)]
+    pub remote_version_url: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

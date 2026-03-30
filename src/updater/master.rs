@@ -106,7 +106,7 @@ impl MasterUpdater {
                     "{} Server upgrade required during check_update login, refreshing version...",
                     self.region.as_str().to_uppercase()
                 );
-                if let Err(e) = self.client.refresh_version().await {
+                if let Err(e) = self.client.refresh_version_from_remote().await {
                     error!(
                         "{} Failed to refresh version: {}",
                         self.region.as_str().to_uppercase(),
