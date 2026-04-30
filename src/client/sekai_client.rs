@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
+use std::io::Read;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -992,6 +993,61 @@ impl SekaiClient {
         Ok(bytes.to_vec())
     }
 
+    pub async fn get_jp_custom_music_score_blob_text(
+        &self,
+        kind: &str,
+        path: &str,
+    ) -> Result<String, AppError> {
+        if self.region != ServerRegion::Jp {
+            return Err(AppError::BadRequest(
+                "custom music score blob is only supported for jp".to_string(),
+            ));
+        }
+        if kind != "full" && kind != "preview" {
+            return Err(AppError::BadRequest(
+                "custom music score blob kind must be full or preview".to_string(),
+            ));
+        }
+
+        let session = self.get_session().ok_or(AppError::NoClientAvailable)?;
+        let path_clean = path.trim_start_matches('/');
+        let url = format!(
+            "{}/blob/custom-music-score/{}/{}",
+            self.config.api_url, kind, path_clean
+        );
+        let req = self.prepare_request(&session, reqwest::Method::GET, &url);
+        let resp = req
+            .send()
+            .await
+            .map_err(|e| AppError::NetworkError(e.to_string()))?;
+        self.update_session_token(&session, &resp);
+
+        let status = resp.status().as_u16();
+        let body = resp
+            .text()
+            .await
+            .map_err(|e| AppError::NetworkError(e.to_string()))?;
+        if status != 200 {
+            return Err(AppError::Unknown { status, body });
+        }
+
+        Ok(body)
+    }
+
+    pub fn decode_custom_music_score_blob_text(blob_text: &str) -> Result<JsonValue, AppError> {
+        use base64::Engine as _;
+
+        let compressed = base64::engine::general_purpose::STANDARD
+            .decode(blob_text.trim())
+            .map_err(|e| AppError::ParseError(format!("base64 decode failed: {}", e)))?;
+        let mut decoder = flate2::read::GzDecoder::new(compressed.as_slice());
+        let mut decoded = Vec::new();
+        decoder
+            .read_to_end(&mut decoded)
+            .map_err(|e| AppError::ParseError(format!("gzip decompress failed: {}", e)))?;
+        sonic_rs::from_slice(&decoded).map_err(AppError::from)
+    }
+
     pub async fn get_nuverse_mysekai_image(
         &self,
         user_id: &str,
@@ -1041,4 +1097,27 @@ pub struct UserRegistration {
         deserialize_with = "super::account::null_or_number_to_string"
     )]
     pub user_id: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SekaiClient;
+    use base64::Engine as _;
+    use flate2::{write::GzEncoder, Compression};
+    use std::io::Write;
+
+    #[test]
+    fn decode_custom_music_score_blob_text_decodes_base64_gzip_json() {
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder
+            .write_all(br#"{"MusicId":121,"NoteList":[{"id":1}]}"#)
+            .unwrap();
+        let compressed = encoder.finish().unwrap();
+        let blob = base64::engine::general_purpose::STANDARD.encode(compressed);
+
+        let decoded = SekaiClient::decode_custom_music_score_blob_text(&blob).unwrap();
+
+        assert_eq!(decoded["MusicId"], 121);
+        assert_eq!(decoded["NoteList"].as_array().unwrap().len(), 1);
+    }
 }

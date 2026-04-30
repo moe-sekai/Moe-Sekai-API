@@ -22,6 +22,7 @@ aes = "0.8.4"
 cbc = { version = "0.1.2", features = ["alloc"] }
 hex = "0.4.3"
 base64 = "0.22.1"
+flate2 = "1.1.8"
 serde_json = { version = "1.0.149", features = ["preserve_order"] }
 jsonwebtoken = { version = "10.3.0", features = ["aws_lc_rs"] }
 sea-orm = { version = "2.0.0-rc.35", features = ["sqlx-sqlite", "sqlx-mysql", "sqlx-postgres", "runtime-tokio-rustls", "macros"] }

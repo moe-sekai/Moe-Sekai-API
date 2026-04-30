@@ -35,6 +35,26 @@ fn get_client(state: &AppState, server: &str) -> Result<Arc<crate::client::Sekai
         .ok_or(AppError::NoClientAvailable)
 }
 
+fn get_jp_client(
+    state: &AppState,
+    server: &str,
+) -> Result<Arc<crate::client::SekaiClient>, AppError> {
+    let region: ServerRegion = server
+        .parse()
+        .map_err(|_| AppError::InvalidServerRegion(server.to_string()))?;
+    if region != ServerRegion::Jp {
+        return Err(AppError::BadRequest(
+            "custom music score endpoints are only supported for jp".to_string(),
+        ));
+    }
+
+    state
+        .clients
+        .get(&region)
+        .cloned()
+        .ok_or(AppError::NoClientAvailable)
+}
+
 async fn proxy_game_api(
     state: &AppState,
     server: &str,
@@ -100,6 +120,73 @@ pub async fn get_event_ranking_top100(
     }
 
     Ok(resp)
+}
+
+pub async fn get_custom_music_score_published_search_id(
+    State(state): State<Arc<AppState>>,
+    Path((server, score_id)): Path<(String, String)>,
+) -> Result<ApiResponse, AppError> {
+    get_jp_client(&state, &server)?;
+    let path = format!(
+        "/user/{{userId}}/custom-music-score/published/search/{}",
+        score_id
+    );
+    proxy_game_api(&state, &server, &path).await
+}
+
+pub async fn get_custom_music_score_full(
+    State(state): State<Arc<AppState>>,
+    Path((server, score_id)): Path<(String, String)>,
+) -> Result<ApiResponse, AppError> {
+    get_custom_music_score_resource(&state, &server, &score_id, "full").await
+}
+
+pub async fn get_custom_music_score_preview(
+    State(state): State<Arc<AppState>>,
+    Path((server, score_id)): Path<(String, String)>,
+) -> Result<ApiResponse, AppError> {
+    get_custom_music_score_resource(&state, &server, &score_id, "preview").await
+}
+
+async fn get_custom_music_score_resource(
+    state: &AppState,
+    server: &str,
+    score_id: &str,
+    kind: &str,
+) -> Result<ApiResponse, AppError> {
+    let client = get_jp_client(state, server)?;
+    let detail_path = format!(
+        "/user/{{userId}}/custom-music-score/published/search/{}",
+        score_id
+    );
+    let (detail, _) = client.get_game_api(&detail_path, None).await?;
+
+    if detail
+        .get("customMusicScoreOfficialCreatorPublishedResponseJson")
+        .is_some()
+    {
+        return Err(AppError::BadRequest(
+            "official creator custom music score does not expose userCustomMusicScorePath"
+                .to_string(),
+        ));
+    }
+
+    let score_path = detail
+        .pointer(
+            "/userCustomMusicScoreInfoJson/userCustomMusicScoreInfoJson/userCustomMusicScorePath",
+        )
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| AppError::ParseError("missing userCustomMusicScorePath".to_string()))?;
+
+    let blob = client
+        .get_jp_custom_music_score_blob_text(kind, score_path)
+        .await?;
+    let body = crate::client::SekaiClient::decode_custom_music_score_blob_text(&blob)?;
+
+    Ok(ApiResponse {
+        status: StatusCode::OK,
+        body,
+    })
 }
 
 pub async fn get_event_ranking_border(

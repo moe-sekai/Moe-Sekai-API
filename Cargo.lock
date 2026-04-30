@@ -2036,6 +2036,7 @@ dependencies = [
  "base64",
  "cbc",
  "chrono",
+ "flate2",
  "futures",
  "git2",
  "hex",

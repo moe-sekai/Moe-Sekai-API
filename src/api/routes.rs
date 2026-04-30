@@ -50,6 +50,18 @@ pub fn create_router(state: Arc<MainAppState>) -> Router {
             "/{server}/event/{event_id}/ranking-border",
             get(apis::get_event_ranking_border),
         )
+        .route(
+            "/{server}/custom-music-score/published/search/{score_id}",
+            get(apis::get_custom_music_score_published_search_id),
+        )
+        .route(
+            "/{server}/custom-music-score/{score_id}/full",
+            get(apis::get_custom_music_score_full),
+        )
+        .route(
+            "/{server}/custom-music-score/{score_id}/preview",
+            get(apis::get_custom_music_score_preview),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
