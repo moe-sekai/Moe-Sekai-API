@@ -655,6 +655,9 @@ impl SekaiClient {
                 _ => reqwest::Method::GET,
             };
             let mut req = self.prepare_request(session, method_enum, &url);
+            if path.contains("/mysekai/") {
+                req = req.header("X-User-Execute-Location", "mysekai");
+            }
             if let Some(p) = params {
                 req = req.query(p);
             }
@@ -704,6 +707,69 @@ impl SekaiClient {
             .await
     }
 
+    pub async fn call_api_with_raw_body(
+        &self,
+        session: &AccountSession,
+        method: &str,
+        path: &str,
+        body: Vec<u8>,
+        params: Option<&HashMap<String, String>>,
+    ) -> Result<Response, AppError> {
+        let _lock = session.lock_api().await;
+        let user_id = session.user_id().to_string();
+        let url = format!("{}/api{}", self.config.api_url, path).replace("{userId}", &user_id);
+        info!("Account #{} {} {}", user_id, method.to_uppercase(), path);
+        let max_retries = 4;
+        let mut last_error = None;
+        for attempt in 1..=max_retries {
+            let method_enum = match method.to_uppercase().as_str() {
+                "GET" => reqwest::Method::GET,
+                "POST" => reqwest::Method::POST,
+                "PUT" => reqwest::Method::PUT,
+                "DELETE" => reqwest::Method::DELETE,
+                "PATCH" => reqwest::Method::PATCH,
+                _ => reqwest::Method::GET,
+            };
+            let mut req = self.prepare_request(session, method_enum, &url);
+            if path.contains("/mysekai/") {
+                req = req.header("X-User-Execute-Location", "mysekai");
+            }
+            if let Some(p) = params {
+                req = req.query(p);
+            }
+            req = req.body(body.clone());
+            match req.send().await {
+                Ok(resp) => {
+                    self.update_session_token(session, &resp);
+                    return Ok(resp);
+                }
+                Err(e) => {
+                    if e.is_timeout() {
+                        warn!(
+                            "Account #{} raw request timed out (attempt {}), retrying...",
+                            session.user_id(),
+                            attempt
+                        );
+                    } else {
+                        error!(
+                            "raw request error (attempt {}): server={}, err={}",
+                            attempt,
+                            self.region.as_str().to_uppercase(),
+                            e
+                        );
+                    }
+                    last_error = Some(AppError::NetworkError(e.to_string()));
+                }
+            }
+            if attempt < max_retries {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
+        }
+        Err(last_error.unwrap_or(AppError::NetworkError(
+            "Request failed after retries".to_string(),
+        )))
+    }
+
     pub async fn post<T: serde::Serialize>(
         &self,
         session: &AccountSession,
@@ -712,6 +778,17 @@ impl SekaiClient {
         params: Option<&HashMap<String, String>>,
     ) -> Result<Response, AppError> {
         self.call_api(session, "POST", path, data, params).await
+    }
+
+    pub async fn post_empty_body(
+        &self,
+        session: &AccountSession,
+        path: &str,
+        params: Option<&HashMap<String, String>>,
+    ) -> Result<Response, AppError> {
+        let encrypted = self.cryptor.pack_bytes_allow_empty(&[])?;
+        self.call_api_with_raw_body(session, "POST", path, encrypted, params)
+            .await
     }
 
     pub async fn handle_response<T: DeserializeOwned>(
@@ -769,6 +846,19 @@ impl SekaiClient {
         &self,
         resp: reqwest::Response,
     ) -> Result<(IndexMap<String, JsonValue>, u16), AppError> {
+        let (value, status) = self.handle_response_value(resp).await?;
+        match value {
+            JsonValue::Object(map) => Ok((map.into_iter().collect(), status)),
+            _ => Err(AppError::CryptoError(
+                "Expected object at top level".to_string(),
+            )),
+        }
+    }
+
+    pub async fn handle_response_value(
+        &self,
+        resp: reqwest::Response,
+    ) -> Result<(JsonValue, u16), AppError> {
         let status = resp.status().as_u16();
         let content_type = resp
             .headers()
@@ -780,58 +870,70 @@ impl SekaiClient {
             .bytes()
             .await
             .map_err(|e| AppError::NetworkError(e.to_string()))?;
+        let sekai_status = SekaiHttpStatus::from_code(status)?;
+
         if content_type.contains("octet-stream") || content_type.contains("binary") {
-            let sekai_status = SekaiHttpStatus::from_code(status)?;
-            match sekai_status {
+            return match sekai_status {
                 SekaiHttpStatus::Ok
                 | SekaiHttpStatus::ClientError
                 | SekaiHttpStatus::NotFound
-                | SekaiHttpStatus::Conflict => self
+                | SekaiHttpStatus::Conflict
+                | SekaiHttpStatus::ServerError => self
                     .cryptor
-                    .unpack_ordered(&body)
-                    .map(|data| (data, status)),
+                    .unpack_value(&body)
+                    .map(|data| (data, status))
+                    .map_err(|e| {
+                        tracing::warn!(
+                            status,
+                            error = %e,
+                            "failed to decode encrypted upstream response"
+                        );
+                        e
+                    }),
                 SekaiHttpStatus::SessionError => Err(AppError::SessionError),
                 SekaiHttpStatus::GameUpgrade => Err(AppError::UpgradeRequired),
                 SekaiHttpStatus::UnderMaintenance => Err(AppError::UnderMaintenance),
-                _ => Err(AppError::Unknown {
-                    status,
-                    body: String::from_utf8_lossy(&body).to_string(),
-                }),
+            };
+        }
+
+        let body_text = String::from_utf8_lossy(&body).trim().to_string();
+        if content_type.contains("json") {
+            let value = if body_text.is_empty() {
+                JsonValue::Null
+            } else {
+                sonic_rs::from_str(&body_text)?
+            };
+            return Ok((value, status));
+        }
+
+        match sekai_status {
+            SekaiHttpStatus::ClientError => Err(AppError::BadRequest(if body_text.is_empty() {
+                "Upstream bad request".to_string()
+            } else {
+                body_text.clone()
+            })),
+            SekaiHttpStatus::NotFound => Err(AppError::NotFound(if body_text.is_empty() {
+                "Upstream resource not found".to_string()
+            } else {
+                body_text.clone()
+            })),
+            SekaiHttpStatus::Conflict => Err(AppError::Internal(if body_text.is_empty() {
+                "Upstream conflict".to_string()
+            } else {
+                body_text.clone()
+            })),
+            SekaiHttpStatus::UnderMaintenance => Err(AppError::UnderMaintenance),
+            SekaiHttpStatus::SessionError if content_type.contains("xml") => {
+                Err(AppError::CookieExpired)
             }
-        } else {
-            let sekai_status = SekaiHttpStatus::from_code(status)?;
-            let body_text = String::from_utf8_lossy(&body).trim().to_string();
-            match sekai_status {
-                SekaiHttpStatus::ClientError => {
-                    Err(AppError::BadRequest(if body_text.is_empty() {
-                        "Upstream bad request".to_string()
-                    } else {
-                        body_text.clone()
-                    }))
-                }
-                SekaiHttpStatus::NotFound => Err(AppError::NotFound(if body_text.is_empty() {
-                    "Upstream resource not found".to_string()
-                } else {
-                    body_text.clone()
-                })),
-                SekaiHttpStatus::Conflict => Err(AppError::Internal(if body_text.is_empty() {
-                    "Upstream conflict".to_string()
-                } else {
-                    body_text.clone()
-                })),
-                SekaiHttpStatus::UnderMaintenance => Err(AppError::UnderMaintenance),
-                SekaiHttpStatus::ServerError => Err(AppError::Unknown {
-                    status,
-                    body: body_text,
-                }),
-                SekaiHttpStatus::SessionError if content_type.contains("xml") => {
-                    Err(AppError::CookieExpired)
-                }
-                _ => Err(AppError::Unknown {
-                    status,
-                    body: body_text,
-                }),
-            }
+            SekaiHttpStatus::ServerError => Err(AppError::Unknown {
+                status,
+                body: body_text,
+            }),
+            _ => Err(AppError::Unknown {
+                status,
+                body: body_text,
+            }),
         }
     }
 
@@ -886,13 +988,35 @@ impl SekaiClient {
         path: &str,
         params: Option<&HashMap<String, String>>,
     ) -> Result<(JsonValue, u16), AppError> {
-        self.get_game_api_with_role(path, params, DEFAULT_PROXY_ROLE)
+        self.call_game_api_with_role("GET", path, params, DEFAULT_PROXY_ROLE)
             .await
     }
 
     #[tracing::instrument(skip(self, params), fields(region = ?self.region, proxy_role = %role))]
     pub async fn get_game_api_with_role(
         &self,
+        path: &str,
+        params: Option<&HashMap<String, String>>,
+        role: &str,
+    ) -> Result<(JsonValue, u16), AppError> {
+        self.call_game_api_with_role("GET", path, params, role)
+            .await
+    }
+
+    #[tracing::instrument(skip(self, params), fields(region = ?self.region, proxy_role = %role))]
+    pub async fn post_game_api_with_role(
+        &self,
+        path: &str,
+        params: Option<&HashMap<String, String>>,
+        role: &str,
+    ) -> Result<(JsonValue, u16), AppError> {
+        self.call_game_api_with_role("POST", path, params, role)
+            .await
+    }
+
+    async fn call_game_api_with_role(
+        &self,
+        method: &str,
         path: &str,
         params: Option<&HashMap<String, String>>,
         role: &str,
@@ -904,11 +1028,14 @@ impl SekaiClient {
         let max_retries = 4;
         let mut retry_count = 0;
         while retry_count < max_retries {
-            let resp = self.get(&session, path, params).await?;
-            match self.handle_response_ordered(resp).await {
-                Ok((result, upstream_status)) => {
-                    let json_value: JsonValue = serde_json::to_value(&result)
-                        .map_err(|e| AppError::ParseError(e.to_string()))?;
+            let resp = if method.eq_ignore_ascii_case("POST") {
+                self.post_empty_body(&session, path, params).await?
+            } else {
+                self.call_api::<()>(&session, method, path, None, params)
+                    .await?
+            };
+            match self.handle_response_value(resp).await {
+                Ok((json_value, upstream_status)) => {
                     return Ok((json_value, upstream_status));
                 }
                 Err(AppError::SessionError) => {

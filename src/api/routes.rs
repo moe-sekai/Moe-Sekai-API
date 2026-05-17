@@ -1,7 +1,11 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use axum::{middleware, routing::get, Json, Router};
+use axum::{
+    middleware,
+    routing::{get, post},
+    Json, Router,
+};
 use serde::Serialize;
 use tower_http::trace::TraceLayer;
 
@@ -44,7 +48,7 @@ pub fn create_router(state: Arc<MainAppState>) -> Router {
         .route("/{server}/information", get(apis::get_information))
         .route(
             "/{server}/user/mysekai/{target_user_id}/room",
-            get(apis::get_mysekai_room),
+            post(apis::post_mysekai_room),
         )
         .route(
             "/{server}/event/{event_id}/ranking-top100",

@@ -57,6 +57,10 @@ impl SekaiCryptor {
         if data.is_empty() {
             return Err(AppError::CryptoError("Content cannot be empty".to_string()));
         }
+        self.pack_bytes_allow_empty(data)
+    }
+
+    pub fn pack_bytes_allow_empty(&self, data: &[u8]) -> Result<Vec<u8>, AppError> {
         let padded = pkcs7_pad(data, 16);
         let encryptor = Aes128CbcEnc::new(&self.key.into(), &self.iv.into());
         let encrypted =

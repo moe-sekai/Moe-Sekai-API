@@ -79,7 +79,7 @@ async fn proxy_game_api(
     })
 }
 
-async fn proxy_game_api_with_role(
+async fn post_game_api_with_role(
     state: &AppState,
     server: &str,
     path: &str,
@@ -87,7 +87,7 @@ async fn proxy_game_api_with_role(
     role: &str,
 ) -> Result<ApiResponse, AppError> {
     let client = get_client(state, server)?;
-    let (data, status) = client.get_game_api_with_role(path, params, role).await?;
+    let (data, status) = client.post_game_api_with_role(path, params, role).await?;
 
     Ok(ApiResponse {
         status: StatusCode::from_u16(status).unwrap_or(StatusCode::OK),
@@ -124,7 +124,7 @@ pub async fn get_information(
     proxy_game_api(&state, &server, "/information").await
 }
 
-pub async fn get_mysekai_room(
+pub async fn post_mysekai_room(
     State(state): State<Arc<AppState>>,
     Path((server, target_user_id)): Path<(String, String)>,
     Query(query): Query<MySekaiRoomQuery>,
@@ -147,7 +147,7 @@ pub async fn get_mysekai_room(
     let path = format!("/user/{{userId}}/mysekai/{}/room/entry", target_user_id);
     let mut params = HashMap::new();
     params.insert("mysekaiVisitType".to_string(), visit_type);
-    proxy_game_api_with_role(&state, &server, &path, Some(&params), MYSEKAI_PROXY_ROLE).await
+    post_game_api_with_role(&state, &server, &path, Some(&params), MYSEKAI_PROXY_ROLE).await
 }
 
 pub async fn get_event_ranking_top100(
