@@ -28,6 +28,10 @@ impl AccountSession {
         self.account.lock().set_user_id(user_id);
     }
 
+    pub fn has_proxy_role(&self, role: &str) -> bool {
+        self.account.lock().has_proxy_role(role)
+    }
+
     pub async fn lock_api(&self) -> tokio::sync::MutexGuard<'_, ()> {
         self.api_lock.lock().await
     }

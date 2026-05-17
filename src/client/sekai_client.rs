@@ -18,7 +18,10 @@ use crate::config::{ServerConfig, ServerRegion};
 use crate::crypto::SekaiCryptor;
 use crate::error::{AppError, SekaiHttpStatus};
 
-use super::account::{AccountType, SekaiAccount, SekaiAccountCP, SekaiAccountNuverse};
+use super::account::{
+    AccountType, SekaiAccount, SekaiAccountCP, SekaiAccountNuverse, DEFAULT_PROXY_ROLE,
+    MYSEKAI_PROXY_ROLE,
+};
 use super::helper::{CookieHelper, VersionHelper, VersionInfo};
 use super::session::AccountSession;
 use super::token_utils;
@@ -574,12 +577,23 @@ impl SekaiClient {
 
     #[must_use]
     pub fn get_session(&self) -> Option<Arc<AccountSession>> {
+        self.get_session_for_role(DEFAULT_PROXY_ROLE).ok()
+    }
+
+    pub fn get_session_for_role(&self, role: &str) -> Result<Arc<AccountSession>, AppError> {
         let sessions = self.sessions.read();
         if sessions.is_empty() {
-            return None;
+            return Err(AppError::NoClientAvailable);
         }
-        let idx = self.session_index.fetch_add(1, Ordering::SeqCst) % sessions.len();
-        Some(sessions[idx].clone())
+        let start = self.session_index.fetch_add(1, Ordering::SeqCst);
+        for offset in 0..sessions.len() {
+            let idx = (start + offset) % sessions.len();
+            let session = sessions[idx].clone();
+            if session.has_proxy_role(role) {
+                return Ok(session);
+            }
+        }
+        Err(AppError::NoProxyAccountForRole(role.to_string()))
     }
 
     fn prepare_request(
@@ -788,11 +802,13 @@ impl SekaiClient {
             let sekai_status = SekaiHttpStatus::from_code(status)?;
             let body_text = String::from_utf8_lossy(&body).trim().to_string();
             match sekai_status {
-                SekaiHttpStatus::ClientError => Err(AppError::BadRequest(if body_text.is_empty() {
-                    "Upstream bad request".to_string()
-                } else {
-                    body_text.clone()
-                })),
+                SekaiHttpStatus::ClientError => {
+                    Err(AppError::BadRequest(if body_text.is_empty() {
+                        "Upstream bad request".to_string()
+                    } else {
+                        body_text.clone()
+                    }))
+                }
                 SekaiHttpStatus::NotFound => Err(AppError::NotFound(if body_text.is_empty() {
                     "Upstream resource not found".to_string()
                 } else {
@@ -870,10 +886,21 @@ impl SekaiClient {
         path: &str,
         params: Option<&HashMap<String, String>>,
     ) -> Result<(JsonValue, u16), AppError> {
+        self.get_game_api_with_role(path, params, DEFAULT_PROXY_ROLE)
+            .await
+    }
+
+    #[tracing::instrument(skip(self, params), fields(region = ?self.region, proxy_role = %role))]
+    pub async fn get_game_api_with_role(
+        &self,
+        path: &str,
+        params: Option<&HashMap<String, String>>,
+        role: &str,
+    ) -> Result<(JsonValue, u16), AppError> {
         while self.reload_in_progress.load(Ordering::SeqCst) {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
-        let session = self.get_session().ok_or(AppError::NoClientAvailable)?;
+        let session = self.get_session_for_role(role)?;
         let max_retries = 4;
         let mut retry_count = 0;
         while retry_count < max_retries {
@@ -971,7 +998,7 @@ impl SekaiClient {
     }
 
     pub async fn get_cp_mysekai_image(&self, path: &str) -> Result<Vec<u8>, AppError> {
-        let session = self.get_session().ok_or(AppError::NoClientAvailable)?;
+        let session = self.get_session_for_role(MYSEKAI_PROXY_ROLE)?;
         let path_clean = path.trim_start_matches('/');
         let image_url = format!("{}/image/mysekai-photo/{}", self.config.api_url, path_clean);
         let req = self.prepare_request(&session, reqwest::Method::GET, &image_url);
@@ -1053,7 +1080,7 @@ impl SekaiClient {
         user_id: &str,
         index: &str,
     ) -> Result<Vec<u8>, AppError> {
-        let session = self.get_session().ok_or(AppError::NoClientAvailable)?;
+        let session = self.get_session_for_role(MYSEKAI_PROXY_ROLE)?;
         let path = format!("/user/{}/mysekai/photo/{}", user_id, index);
         let resp = self.get(&session, &path, None).await?;
         let data: std::collections::HashMap<String, serde_json::Value> =

@@ -1,4 +1,4 @@
-mod account;
+pub(crate) mod account;
 pub mod helper;
 pub mod nuverse;
 pub mod sekai_client;

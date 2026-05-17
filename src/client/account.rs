@@ -2,6 +2,9 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::error::AppError;
 
+pub const DEFAULT_PROXY_ROLE: &str = "default";
+pub const MYSEKAI_PROXY_ROLE: &str = "mysekai";
+
 fn null_to_empty_string<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: Deserializer<'de>,
@@ -34,7 +37,30 @@ pub trait SekaiAccount: Send + Sync {
     fn set_user_id(&mut self, user_id: String);
     fn device_id(&self) -> &str;
     fn token(&self) -> &str;
+    fn proxy_roles(&self) -> &[String];
     fn dump(&self) -> Result<Vec<u8>, AppError>;
+
+    fn has_proxy_role(&self, role: &str) -> bool {
+        normalized_proxy_roles(self.proxy_roles())
+            .iter()
+            .any(|configured| configured == &normalize_proxy_role(role))
+    }
+}
+
+pub fn normalize_proxy_role(role: &str) -> String {
+    role.trim().to_ascii_lowercase()
+}
+
+pub fn normalized_proxy_roles(roles: &[String]) -> Vec<String> {
+    let mut normalized: Vec<String> = roles
+        .iter()
+        .map(|role| normalize_proxy_role(role))
+        .filter(|role| !role.is_empty())
+        .collect();
+    if normalized.is_empty() {
+        normalized.push(DEFAULT_PROXY_ROLE.to_string());
+    }
+    normalized
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,6 +79,8 @@ pub struct SekaiAccountCP {
     pub device_id: String,
     #[serde(default, deserialize_with = "null_to_empty_string")]
     pub credential: String,
+    #[serde(rename = "proxyRoles", alias = "proxy_roles", default)]
+    pub proxy_roles: Vec<String>,
 }
 
 impl SekaiAccount for SekaiAccountCP {
@@ -70,6 +98,10 @@ impl SekaiAccount for SekaiAccountCP {
 
     fn token(&self) -> &str {
         &self.credential
+    }
+
+    fn proxy_roles(&self) -> &[String] {
+        &self.proxy_roles
     }
 
     fn dump(&self) -> Result<Vec<u8>, AppError> {
@@ -117,6 +149,8 @@ pub struct SekaiAccountNuverse {
         deserialize_with = "null_to_empty_string"
     )]
     pub access_token: String,
+    #[serde(rename = "proxyRoles", alias = "proxy_roles", default)]
+    pub proxy_roles: Vec<String>,
 }
 
 impl SekaiAccount for SekaiAccountNuverse {
@@ -134,6 +168,10 @@ impl SekaiAccount for SekaiAccountNuverse {
 
     fn token(&self) -> &str {
         &self.access_token
+    }
+
+    fn proxy_roles(&self) -> &[String] {
+        &self.proxy_roles
     }
 
     fn dump(&self) -> Result<Vec<u8>, AppError> {
@@ -203,10 +241,52 @@ impl SekaiAccount for AccountType {
         }
     }
 
+    fn proxy_roles(&self) -> &[String] {
+        match self {
+            AccountType::CP(a) => a.proxy_roles(),
+            AccountType::Nuverse(a) => a.proxy_roles(),
+        }
+    }
+
     fn dump(&self) -> Result<Vec<u8>, AppError> {
         match self {
             AccountType::CP(a) => a.dump(),
             AccountType::Nuverse(a) => a.dump(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_proxy_roles_default_to_normal_proxying() {
+        assert_eq!(
+            normalized_proxy_roles(&[]),
+            vec![DEFAULT_PROXY_ROLE.to_string()]
+        );
+    }
+
+    #[test]
+    fn proxy_roles_are_trimmed_and_lowercased() {
+        let roles = vec![" MySekai ".to_string(), "".to_string()];
+        assert_eq!(
+            normalized_proxy_roles(&roles),
+            vec![MYSEKAI_PROXY_ROLE.to_string()]
+        );
+    }
+
+    #[test]
+    fn account_role_matching_does_not_fallback_for_special_roles() {
+        let account = SekaiAccountCP {
+            user_id: "1".to_string(),
+            device_id: "device".to_string(),
+            credential: "credential".to_string(),
+            proxy_roles: vec![MYSEKAI_PROXY_ROLE.to_string()],
+        };
+
+        assert!(account.has_proxy_role(MYSEKAI_PROXY_ROLE));
+        assert!(!account.has_proxy_role(DEFAULT_PROXY_ROLE));
     }
 }

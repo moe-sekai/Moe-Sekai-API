@@ -43,6 +43,10 @@ pub fn create_router(state: Arc<MainAppState>) -> Router {
         .route("/{server}/system", get(apis::get_system))
         .route("/{server}/information", get(apis::get_information))
         .route(
+            "/{server}/user/mysekai/{target_user_id}/room",
+            get(apis::get_mysekai_room),
+        )
+        .route(
             "/{server}/event/{event_id}/ranking-top100",
             get(apis::get_event_ranking_top100),
         )

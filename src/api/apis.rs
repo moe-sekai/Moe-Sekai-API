@@ -1,12 +1,16 @@
 use std::sync::Arc;
 
+use std::collections::HashMap;
+
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use serde::Deserialize;
 use serde_json::Value as JsonValue;
 
+use crate::client::account::MYSEKAI_PROXY_ROLE;
 use crate::config::ServerRegion;
 use crate::error::AppError;
 use crate::AppState;
@@ -33,6 +37,12 @@ fn get_client(state: &AppState, server: &str) -> Result<Arc<crate::client::Sekai
         .get(&region)
         .cloned()
         .ok_or(AppError::NoClientAvailable)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MySekaiRoomQuery {
+    #[serde(rename = "mysekaiVisitType", default)]
+    pub mysekai_visit_type: Option<String>,
 }
 
 fn get_jp_client(
@@ -69,6 +79,22 @@ async fn proxy_game_api(
     })
 }
 
+async fn proxy_game_api_with_role(
+    state: &AppState,
+    server: &str,
+    path: &str,
+    params: Option<&HashMap<String, String>>,
+    role: &str,
+) -> Result<ApiResponse, AppError> {
+    let client = get_client(state, server)?;
+    let (data, status) = client.get_game_api_with_role(path, params, role).await?;
+
+    Ok(ApiResponse {
+        status: StatusCode::from_u16(status).unwrap_or(StatusCode::OK),
+        body: data,
+    })
+}
+
 pub async fn get_user_profile(
     State(state): State<Arc<AppState>>,
     axum::Extension(auth_user): axum::Extension<Option<crate::api::middleware::AuthUser>>,
@@ -96,6 +122,32 @@ pub async fn get_information(
     Path(server): Path<String>,
 ) -> Result<ApiResponse, AppError> {
     proxy_game_api(&state, &server, "/information").await
+}
+
+pub async fn get_mysekai_room(
+    State(state): State<Arc<AppState>>,
+    Path((server, target_user_id)): Path<(String, String)>,
+    Query(query): Query<MySekaiRoomQuery>,
+) -> Result<ApiResponse, AppError> {
+    if !target_user_id.chars().all(|c| c.is_ascii_digit()) {
+        return Err(AppError::ParseError(
+            "target_user_id must be numeric".to_string(),
+        ));
+    }
+
+    let visit_type = query
+        .mysekai_visit_type
+        .unwrap_or_else(|| "id_search".to_string());
+    if visit_type != "id_search" {
+        return Err(AppError::BadRequest(
+            "mysekaiVisitType must be id_search".to_string(),
+        ));
+    }
+
+    let path = format!("/user/{{userId}}/mysekai/{}/room/entry", target_user_id);
+    let mut params = HashMap::new();
+    params.insert("mysekaiVisitType".to_string(), visit_type);
+    proxy_game_api_with_role(&state, &server, &path, Some(&params), MYSEKAI_PROXY_ROLE).await
 }
 
 pub async fn get_event_ranking_top100(

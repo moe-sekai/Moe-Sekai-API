@@ -25,6 +25,9 @@ pub enum AppError {
     #[error("No client available")]
     NoClientAvailable,
 
+    #[error("No proxy account available for role: {0}")]
+    NoProxyAccountForRole(String),
+
     #[error("Invalid server region: {0}")]
     InvalidServerRegion(String),
 
@@ -74,13 +77,15 @@ impl AppError {
             AppError::SessionError | AppError::CookieExpired => StatusCode::FORBIDDEN,
             AppError::UpgradeRequired => StatusCode::UPGRADE_REQUIRED,
             AppError::UnderMaintenance => StatusCode::SERVICE_UNAVAILABLE,
-            AppError::InvalidServerRegion(_) | AppError::ParseError(_) | AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
+            AppError::InvalidServerRegion(_)
+            | AppError::ParseError(_)
+            | AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
             AppError::AuthError(_) => StatusCode::UNAUTHORIZED,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Forbidden(_) => StatusCode::FORBIDDEN,
-            AppError::NoClientAvailable | AppError::NoAccountError => {
-                StatusCode::SERVICE_UNAVAILABLE
-            }
+            AppError::NoClientAvailable
+            | AppError::NoAccountError
+            | AppError::NoProxyAccountForRole(_) => StatusCode::SERVICE_UNAVAILABLE,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

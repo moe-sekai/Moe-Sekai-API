@@ -97,6 +97,21 @@ docker run -d \
 访问受保护路由时使用请求头：
 - `x-moe-sekai-token`
 
+### 代理账号标记
+
+账号 JSON 支持可选字段 `proxyRoles`，用于标记该游戏账号可以代理哪些类型的接口：
+
+```json
+{
+  "userId": "123456789",
+  "deviceId": "...",
+  "credential": "...",
+  "proxyRoles": ["mysekai"]
+}
+```
+
+未配置 `proxyRoles` 的账号默认只用于普通接口。`/mysekai/` 相关路由会使用 `proxyRoles` 包含 `mysekai` 的账号代理。
+
 ## 目录建议
 
 建议将运行时数据与源码分离。一个常见布局如下：

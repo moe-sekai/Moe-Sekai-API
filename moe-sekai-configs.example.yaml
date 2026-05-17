@@ -43,6 +43,10 @@ master_database:
 apphash_sources: []
 asset_updater_servers: []
 
+# Game account JSON files under each account_dir may include:
+#   "proxyRoles": ["mysekai"]
+# Accounts without proxyRoles are used for normal API proxying only.
+# /mysekai/ related routes require an account marked with the mysekai role.
 servers:
   jp:
     enabled: false
