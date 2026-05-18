@@ -1124,7 +1124,7 @@ impl SekaiClient {
         ))
     }
 
-    pub async fn get_cp_mysekai_image(&self, path: &str) -> Result<Vec<u8>, AppError> {
+    pub async fn get_cp_mysekai_image(&self, path: &str) -> Result<(Vec<u8>, String), AppError> {
         let session = self.get_session_for_role(MYSEKAI_PROXY_ROLE)?;
         let path_clean = path.trim_start_matches('/');
         let image_url = format!("{}/image/mysekai-photo/{}", self.config.api_url, path_clean);
@@ -1140,11 +1140,52 @@ impl SekaiClient {
                 body: format!("Failed to fetch image from {}", image_url),
             });
         }
+        let content_type = resp
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("application/octet-stream")
+            .to_string();
         let bytes = resp
             .bytes()
             .await
             .map_err(|e| AppError::NetworkError(e.to_string()))?;
-        Ok(bytes.to_vec())
+        Ok((bytes.to_vec(), content_type))
+    }
+
+    pub async fn get_cp_mysekai_housing_thumbnail(
+        &self,
+        path: &str,
+    ) -> Result<(Vec<u8>, String), AppError> {
+        let session = self.get_session_for_role(MYSEKAI_PROXY_ROLE)?;
+        let path_clean = path.trim_start_matches('/');
+        let image_url = format!(
+            "{}/image/mysekai-housing-competition/thumbnail/{}",
+            self.config.api_url, path_clean
+        );
+        let req = self.prepare_request(&session, reqwest::Method::GET, &image_url);
+        let resp = req
+            .send()
+            .await
+            .map_err(|e| AppError::NetworkError(e.to_string()))?;
+        let status = resp.status().as_u16();
+        if status != 200 {
+            return Err(AppError::Unknown {
+                status,
+                body: format!("Failed to fetch image from {}", image_url),
+            });
+        }
+        let content_type = resp
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("application/octet-stream")
+            .to_string();
+        let bytes = resp
+            .bytes()
+            .await
+            .map_err(|e| AppError::NetworkError(e.to_string()))?;
+        Ok((bytes.to_vec(), content_type))
     }
 
     pub async fn get_jp_custom_music_score_blob_text(

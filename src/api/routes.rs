@@ -37,10 +37,16 @@ pub async fn health_check() -> Json<HealthResponse> {
 pub fn create_router(state: Arc<MainAppState>) -> Router {
     START_TIME.get_or_init(Instant::now);
 
-    let public_routes = Router::new().route("/health", get(health_check)).route(
-        "/image/{server}/mysekai/{param1}/{param2}",
-        get(image::get_mysekai_image),
-    );
+    let public_routes = Router::new()
+        .route("/health", get(health_check))
+        .route(
+            "/image/{server}/mysekai/{param1}/{param2}",
+            get(image::get_mysekai_image),
+        )
+        .route(
+            "/image/{server}/mysekai-housing/{hash1}/{hash2}",
+            get(image::get_mysekai_housing_thumbnail),
+        );
 
     let api_routes = Router::new()
         .route("/{server}/{user_id}/profile", get(apis::get_user_profile))
@@ -49,6 +55,10 @@ pub fn create_router(state: Arc<MainAppState>) -> Router {
         .route(
             "/{server}/user/mysekai/{target_user_id}/room",
             post(apis::post_mysekai_room),
+        )
+        .route(
+            "/{server}/user/mysekai/housing-competition/{housing_id}/list",
+            get(apis::get_mysekai_housing_competition_list),
         )
         .route(
             "/{server}/event/{event_id}/ranking-top100",

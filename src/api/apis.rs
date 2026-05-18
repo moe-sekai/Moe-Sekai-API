@@ -45,6 +45,12 @@ pub struct MySekaiRoomQuery {
     pub mysekai_visit_type: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct MySekaiHousingCompetitionListQuery {
+    #[serde(rename = "isLottery", default)]
+    pub is_lottery: Option<String>,
+}
+
 fn get_jp_client(
     state: &AppState,
     server: &str,
@@ -88,6 +94,22 @@ async fn post_game_api_with_role(
 ) -> Result<ApiResponse, AppError> {
     let client = get_client(state, server)?;
     let (data, status) = client.post_game_api_with_role(path, params, role).await?;
+
+    Ok(ApiResponse {
+        status: StatusCode::from_u16(status).unwrap_or(StatusCode::OK),
+        body: data,
+    })
+}
+
+async fn get_game_api_with_role(
+    state: &AppState,
+    server: &str,
+    path: &str,
+    params: Option<&HashMap<String, String>>,
+    role: &str,
+) -> Result<ApiResponse, AppError> {
+    let client = get_client(state, server)?;
+    let (data, status) = client.get_game_api_with_role(path, params, role).await?;
 
     Ok(ApiResponse {
         status: StatusCode::from_u16(status).unwrap_or(StatusCode::OK),
@@ -148,6 +170,42 @@ pub async fn post_mysekai_room(
     let mut params = HashMap::new();
     params.insert("mysekaiVisitType".to_string(), visit_type);
     post_game_api_with_role(&state, &server, &path, Some(&params), MYSEKAI_PROXY_ROLE).await
+}
+
+pub async fn get_mysekai_housing_competition_list(
+    State(state): State<Arc<AppState>>,
+    Path((server, housing_id)): Path<(String, String)>,
+    Query(query): Query<MySekaiHousingCompetitionListQuery>,
+) -> Result<ApiResponse, AppError> {
+    if !housing_id.chars().all(|c| c.is_ascii_digit()) {
+        return Err(AppError::ParseError(
+            "housing_id must be numeric".to_string(),
+        ));
+    }
+
+    let is_lottery = match query.is_lottery.as_deref() {
+        None | Some("") => false,
+        Some(v) => match v.to_ascii_lowercase().as_str() {
+            "true" => true,
+            "false" => false,
+            _ => {
+                return Err(AppError::BadRequest(
+                    "isLottery must be true or false".to_string(),
+                ));
+            }
+        },
+    };
+
+    let path = format!(
+        "/user/{{userId}}/mysekai/housing-competition/{}/list",
+        housing_id
+    );
+    let mut params = HashMap::new();
+    params.insert(
+        "isLottery".to_string(),
+        if is_lottery { "True" } else { "False" }.to_string(),
+    );
+    get_game_api_with_role(&state, &server, &path, Some(&params), MYSEKAI_PROXY_ROLE).await
 }
 
 pub async fn get_event_ranking_top100(
