@@ -7,8 +7,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
+use serde::Deserialize;
+use serde_json::{json, Value as JsonValue};
 
 use crate::client::account::MYSEKAI_PROXY_ROLE;
 use crate::config::ServerRegion;
@@ -55,14 +55,6 @@ pub struct MySekaiHousingCompetitionListQuery {
 pub struct MySekaiHousingCompetitionEntryQuery {
     #[serde(rename = "isBackNumber", default)]
     pub is_back_number: Option<String>,
-    #[serde(rename = "mysekaiOwnerUserSubmittedAt")]
-    pub mysekai_owner_user_submitted_at: i64,
-}
-
-#[derive(Debug, Serialize)]
-pub struct MySekaiHousingCompetitionEntryRequest {
-    #[serde(rename = "isBackNumber")]
-    pub is_back_number: bool,
     #[serde(rename = "mysekaiOwnerUserSubmittedAt")]
     pub mysekai_owner_user_submitted_at: i64,
 }
@@ -117,11 +109,11 @@ async fn post_game_api_with_role(
     })
 }
 
-async fn post_game_api_body_with_role<T: Serialize>(
+async fn post_game_api_body_with_role(
     state: &AppState,
     server: &str,
     path: &str,
-    body: &T,
+    body: &JsonValue,
     params: Option<&HashMap<String, String>>,
     role: &str,
 ) -> Result<ApiResponse, AppError> {
@@ -271,10 +263,10 @@ pub async fn post_mysekai_housing_competition_entry(
             }
         },
     };
-    let body = MySekaiHousingCompetitionEntryRequest {
-        is_back_number,
-        mysekai_owner_user_submitted_at: query.mysekai_owner_user_submitted_at,
-    };
+    let body = json!({
+        "isBackNumber": is_back_number,
+        "mysekaiOwnerUserSubmittedAt": query.mysekai_owner_user_submitted_at,
+    });
 
     let path = format!(
         "/user/{{userId}}/mysekai/housing-competition/{}/mysekai-owner/{}/entry",
