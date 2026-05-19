@@ -50,8 +50,8 @@ async fn main() -> anyhow::Result<()> {
             std::process::exit(1);
         }
     };
-    let config_path = std::env::var("CONFIG_PATH")
-        .unwrap_or_else(|_| "moe-sekai-configs.yaml".to_string());
+    let config_path =
+        std::env::var("CONFIG_PATH").unwrap_or_else(|_| "moe-sekai-configs.yaml".to_string());
     info!("Using config file: {}", config_path);
     if let Ok(port) = std::env::var("PORT") {
         info!("PORT environment override detected: {}", port);

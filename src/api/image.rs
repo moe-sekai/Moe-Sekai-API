@@ -112,8 +112,9 @@ pub async fn get_mysekai_housing_thumbnail(
     static HEX64: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     static UUID_LC: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     let hex64 = HEX64.get_or_init(|| Regex::new(r"^[a-f0-9]{64}$").unwrap());
-    let uuid_lc = UUID_LC
-        .get_or_init(|| Regex::new(r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$").unwrap());
+    let uuid_lc = UUID_LC.get_or_init(|| {
+        Regex::new(r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$").unwrap()
+    });
     if !hex64.is_match(&hash1) || !uuid_lc.is_match(&hash2) {
         return (
             StatusCode::BAD_REQUEST,

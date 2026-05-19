@@ -37,7 +37,9 @@ pub async fn auth_middleware(
 ) -> Response {
     req.extensions_mut().insert(None::<AuthUser>);
     if state.db.is_none() {
-        tracing::error!("Auth middleware misconfigured: database is required for protected API routes");
+        tracing::error!(
+            "Auth middleware misconfigured: database is required for protected API routes"
+        );
         return error_response(
             StatusCode::SERVICE_UNAVAILABLE,
             "Authentication service unavailable",
@@ -123,10 +125,8 @@ pub async fn auth_middleware(
                 Ok(Some(_)) => {
                     tracing::debug!("User {} authorized for server {}", user.id, server);
                     if let Some(ref redis) = state.redis {
-                        let cache_key = format!(
-                            "moe_sekai_api:{}:{}:{}",
-                            user.id, claims.credential, server
-                        );
+                        let cache_key =
+                            format!("moe_sekai_api:{}:{}:{}", user.id, claims.credential, server);
                         let mut conn: redis::aio::ConnectionManager = redis.clone();
                         let _: Result<(), _> =
                             redis::AsyncCommands::set_ex(&mut conn, &cache_key, "1", 43200u64)
@@ -140,10 +140,7 @@ pub async fn auth_middleware(
                 }
                 Ok(None) => {
                     tracing::warn!("User {} not authorized for server {}", user.id, server);
-                    return error_response(
-                        StatusCode::FORBIDDEN,
-                        "Not authorized for this server",
-                    );
+                    return error_response(StatusCode::FORBIDDEN, "Not authorized for this server");
                 }
                 Err(e) => {
                     tracing::error!("Database error checking server auth: {:?}", e);

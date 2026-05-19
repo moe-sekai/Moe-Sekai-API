@@ -131,10 +131,11 @@ impl VersionHelper {
         let mut builder = Client::builder().timeout(std::time::Duration::from_secs(10));
         if let Some(proxy_url) = proxy {
             if !proxy_url.is_empty() {
-                builder = builder.proxy(
-                    reqwest::Proxy::all(proxy_url)
-                        .map_err(|e| AppError::NetworkError(format!("Invalid proxy: {}", e)))?,
-                );
+                builder =
+                    builder
+                        .proxy(reqwest::Proxy::all(proxy_url).map_err(|e| {
+                            AppError::NetworkError(format!("Invalid proxy: {}", e))
+                        })?);
             }
         }
         let client = builder

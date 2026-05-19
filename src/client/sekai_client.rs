@@ -1014,10 +1014,46 @@ impl SekaiClient {
             .await
     }
 
+    #[tracing::instrument(skip(self, body, params), fields(region = ?self.region, proxy_role = %role))]
+    pub async fn post_game_api_with_body_and_role<T: serde::Serialize>(
+        &self,
+        path: &str,
+        body: &T,
+        params: Option<&HashMap<String, String>>,
+        role: &str,
+    ) -> Result<(JsonValue, u16), AppError> {
+        self.call_game_api_with_body_and_role("POST", path, body, params, role)
+            .await
+    }
+
     async fn call_game_api_with_role(
         &self,
         method: &str,
         path: &str,
+        params: Option<&HashMap<String, String>>,
+        role: &str,
+    ) -> Result<(JsonValue, u16), AppError> {
+        self.call_game_api_with_optional_body_and_role::<()>(method, path, None, params, role)
+            .await
+    }
+
+    async fn call_game_api_with_body_and_role<T: serde::Serialize>(
+        &self,
+        method: &str,
+        path: &str,
+        body: &T,
+        params: Option<&HashMap<String, String>>,
+        role: &str,
+    ) -> Result<(JsonValue, u16), AppError> {
+        self.call_game_api_with_optional_body_and_role(method, path, Some(body), params, role)
+            .await
+    }
+
+    async fn call_game_api_with_optional_body_and_role<T: serde::Serialize>(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<&T>,
         params: Option<&HashMap<String, String>>,
         role: &str,
     ) -> Result<(JsonValue, u16), AppError> {
@@ -1029,7 +1065,11 @@ impl SekaiClient {
         let mut retry_count = 0;
         while retry_count < max_retries {
             let resp = if method.eq_ignore_ascii_case("POST") {
-                self.post_empty_body(&session, path, params).await?
+                if let Some(body) = body {
+                    self.post(&session, path, Some(body), params).await?
+                } else {
+                    self.post_empty_body(&session, path, params).await?
+                }
             } else {
                 self.call_api::<()>(&session, method, path, None, params)
                     .await?
