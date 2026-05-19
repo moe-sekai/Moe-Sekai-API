@@ -61,6 +61,10 @@ pub fn create_router(state: Arc<MainAppState>) -> Router {
             get(apis::get_mysekai_housing_competition_list),
         )
         .route(
+            "/{server}/user/mysekai/housing-competition/{housing_id}/mysekai-owner/{owner_user_id}/entry",
+            post(apis::post_mysekai_housing_competition_entry),
+        )
+        .route(
             "/{server}/event/{event_id}/ranking-top100",
             get(apis::get_event_ranking_top100),
         )

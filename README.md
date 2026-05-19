@@ -110,7 +110,7 @@ docker run -d \
 }
 ```
 
-未配置 `proxyRoles` 的账号默认只用于普通接口。`/mysekai/` 相关路由会使用 `proxyRoles` 包含 `mysekai` 的账号代理。
+未配置 `proxyRoles` 的账号默认只用于普通接口。`/mysekai/` 相关路由会使用 `proxyRoles` 包含 `mysekai` 的账号代理，例如 `POST /api/{server}/user/mysekai/housing-competition/{housing_id}/mysekai-owner/{owner_user_id}/entry`。
 
 ## 目录建议
 

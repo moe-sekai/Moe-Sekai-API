@@ -208,6 +208,28 @@ pub async fn get_mysekai_housing_competition_list(
     get_game_api_with_role(&state, &server, &path, Some(&params), MYSEKAI_PROXY_ROLE).await
 }
 
+pub async fn post_mysekai_housing_competition_entry(
+    State(state): State<Arc<AppState>>,
+    Path((server, housing_id, owner_user_id)): Path<(String, String, String)>,
+) -> Result<ApiResponse, AppError> {
+    if !housing_id.chars().all(|c| c.is_ascii_digit()) {
+        return Err(AppError::ParseError(
+            "housing_id must be numeric".to_string(),
+        ));
+    }
+    if !owner_user_id.chars().all(|c| c.is_ascii_digit()) {
+        return Err(AppError::ParseError(
+            "owner_user_id must be numeric".to_string(),
+        ));
+    }
+
+    let path = format!(
+        "/user/{{userId}}/mysekai/housing-competition/{}/mysekai-owner/{}/entry",
+        housing_id, owner_user_id
+    );
+    post_game_api_with_role(&state, &server, &path, None, MYSEKAI_PROXY_ROLE).await
+}
+
 pub async fn get_event_ranking_top100(
     State(state): State<Arc<AppState>>,
     Path((server, event_id)): Path<(String, String)>,
